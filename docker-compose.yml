@@ -1,5 +1,14 @@
 version: '3.3'
 services:
+
+  # Set up postgres database
+  db:
+    image: postgres:9.6.5
+    # Provide a location for data to be saved will persist data
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  # Set up Django REST API
   api:
     build: .
     command: bash -c "python /code/manage.py runserver 0.0.0.0:8000"
@@ -9,10 +18,28 @@ services:
       - "8000:8000"
     depends_on:
       - db
-  db:
-    image: postgres:9.6.5
-    # Provide a location for data to be saved will persist data
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
+
+  # Set up monitoring application
+  prometheus:
+    build: metrics/.
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+      - source: prometheus_rules
+        target: /etc/prometheus/alert.rules.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    deploy:
+      placement:
+        constraints:
+          - 'node.role == manager'
+          - 'node.platform.os == linux'
+      resources:
+        limits:
+          memory: 500M
+        reservations:
+          memory: 200M
 volumes:
   postgres_data:
